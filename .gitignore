@@ -1,0 +1,31 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.pyc
+
+# Virtual environments
+.venv
+
+# Credentials and secrets
+*.json
+.env
+terraform/terraform.tfvars
+
+# Terraform state and lock files
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# dbt generated artifacts
+dbt/equity_transforms/target/
+dbt/equity_transforms/dbt_packages/
+dbt/equity_transforms/logs/
+
+# General logs
+logs/
+*.log
