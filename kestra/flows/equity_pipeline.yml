@@ -1,0 +1,82 @@
+id: equity_pipeline
+namespace: equity.analytics
+
+# Daily trigger — runs at 6 AM UTC on weekdays (Mon-Fri)
+# US market closes at 4 PM ET (9 PM UTC). 6 AM UTC next day gives
+# yfinance time to finalize the previous day's adjusted prices.
+triggers:
+  - id: daily_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 6 * * 1-5"
+
+tasks:
+
+  # Task 1 — Download from yfinance and upload Parquet files to GCS
+  - id: ingest
+    type: io.kestra.plugin.scripts.python.Commands
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      volumes:
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+    containerImage: python:3.12-slim
+    commands:
+      - pip install yfinance pandas pyarrow google-cloud-storage python-dotenv --quiet
+      - python /app/project/ingestion/ingest.py
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
+      BUCKET_NAME: equity-analytics-pipeline-equity-lake
+      PREFIX: raw/equities/
+      START_DATE: "2020-01-01"
+      END_DATE: "2024-12-31"
+      PROJECT_ID: equity-analytics-pipeline
+      DATASET_RAW: equity_raw
+
+  # Task 2 — Load GCS Parquet files into BigQuery; create partitioned table
+  - id: load_to_bq
+    type: io.kestra.plugin.scripts.python.Commands
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      volumes:
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+    containerImage: python:3.12-slim
+    commands:
+      - pip install pandas pyarrow google-cloud-storage google-cloud-bigquery db-dtypes pandas-gbq python-dotenv --quiet
+      - python /app/project/ingestion/load_to_bq.py
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
+      BUCKET_NAME: equity-analytics-pipeline-equity-lake
+      PREFIX: raw/equities/
+      START_DATE: "2020-01-01"
+      END_DATE: "2024-12-31"
+      PROJECT_ID: equity-analytics-pipeline
+      DATASET_RAW: equity_raw
+
+  # Task 3 — Run all dbt models (staging → marts → reporting)
+  # Disabled until dbt models are complete
+  - id: dbt_run
+    type: io.kestra.plugin.scripts.shell.Commands
+    disabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      volumes:
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+    containerImage: ghcr.io/dbt-labs/dbt-bigquery:1.8.0
+    commands:
+      - cd /app/project/dbt/equity_transforms && dbt run --profiles-dir .
+
+  # Task 4 — Run dbt tests to validate transformed data quality
+  # Disabled until dbt models are complete
+  - id: dbt_test
+    type: io.kestra.plugin.scripts.shell.Commands
+    disabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      volumes:
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
+        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+    containerImage: ghcr.io/dbt-labs/dbt-bigquery:1.8.0
+    commands:
+      - cd /app/project/dbt/equity_transforms && dbt test --profiles-dir .

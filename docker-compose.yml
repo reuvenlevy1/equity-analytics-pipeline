@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  # Kestra's backing database — stores flow definitions, execution history, logs
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER:     kestra
+      POSTGRES_PASSWORD: kestra
+      POSTGRES_DB:       kestra
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kestra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kestra orchestration server
+  kestra:
+    image: kestra/kestra:latest
+    user: root
+    command: server standalone
+    ports:
+      - "8080:8080"
+    environment:
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: kestra
+        kestra:
+          repository:
+            type: postgres
+          storage:
+            type: local
+            local:
+              basePath: /app/storage
+          queue:
+            type: postgres
+          tasks:
+            tmp-dir:
+              path: /tmp/kestra-wd/tmp
+          plugins:
+            configurations:
+              - type: io.kestra.plugin.scripts.runner.docker.Docker
+                values:
+                  volume-enabled: true
+    volumes:
+      - kestra_storage:/app/storage
+      # Mount project root so Kestra can run our Python scripts directly
+      - .:/app/project
+      # Mount GCP credentials so Kestra's Python tasks can authenticate
+      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
+      # Mount Docker socket so Kestra can run tasks in Docker containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount a writable directory for Kestra's task runner to use as a working directory
+      - /tmp/kestra-wd:/tmp/kestra-wd:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  kestra_storage:

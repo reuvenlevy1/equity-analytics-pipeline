@@ -75,6 +75,34 @@
 [include: Kestra DAG screenshot, dbt lineage screenshot]
 
 
+### Orchestration
+
+
+The pipeline is orchestrated by [Kestra](https://kestra.io/) running in Docker.
+A single flow (`kestra/flows/equity_pipeline.yml`) defines a 4-task DAG that
+runs automatically at 6 AM UTC every weekday:
+
+
+1. **ingest** — downloads OHLCV data from yfinance, uploads Parquet files to GCS
+2. **load_to_bq** — loads Parquet files from GCS into BigQuery raw tables
+3. **dbt_run** — executes all dbt models (staging → marts → reporting)
+4. **dbt_test** — runs data quality tests on all transformed tables
+
+
+Tasks execute sequentially — each must complete successfully before the next
+starts. If any task fails, Kestra halts execution and downstream tasks do not
+run on bad data.
+
+
+Each task runs in an isolated Docker container (`python:3.12-slim` for ingestion,
+`ghcr.io/dbt-labs/dbt-bigquery:1.8.0` for transformation) with dependencies
+installed fresh per execution.
+
+
+<!-- TODO: replace screenshot after dbt tasks are re-enabled -->
+![Kestra DAG](images/kestra_dag.png)
+
+
 ## BigQuery: Partitioning & Clustering
 
 
