@@ -33,7 +33,15 @@
 ## Tech Stack
 
 
-[table: Component | Technology | Purpose — 2-sentence justification per tool]
+| Component              | Technology           | Purpose |
+|------------------------|----------------------|---------|
+| Infrastructure as Code | Terraform            | Provisions the GCS data lake bucket and BigQuery datasets reproducibly. Any reviewer can recreate the full cloud infrastructure with three commands (`terraform init`, `terraform plan`, `terraform apply`). |
+| Cloud Platform         | GCP                  | Hosts all infrastructure — object storage (GCS), analytical database (BigQuery), and authentication (IAM service accounts). |
+| Data Lake              | Google Cloud Storage | Stores raw OHLCV data as Parquet files partitioned by ticker. Decouples ingestion from the warehouse — raw data survives independently of BigQuery. |
+| Data Warehouse         | BigQuery             | Stores and queries structured equity data. Tables are partitioned by date and clustered by ticker and sector for query efficiency. |
+| Data Ingestion         | Python + yfinance    | Downloads daily OHLCV data for 33 US equities and SPY from Yahoo Finance. No API key required. |
+| Environment Management | uv                   | Manages Python virtual environments and dependency locking. Ensures reproducible installs across local and containerized environments. |
+| Version Control        | Git + GitHub         | Tracks all code changes. Required for zoomcamp project submission and peer review. |
 
 
 ## Architecture
@@ -65,7 +73,8 @@
 ## BigQuery: Partitioning & Clustering
 
 
-[partitioned by DATE(date), clustered by ticker and sector — explain WHY]
+Raw data is loaded into the `equity_raw` dataset provisioned by Terraform.
+Partitioning and clustering details are covered in Phase 4.
 
 
 ## dbt Models
