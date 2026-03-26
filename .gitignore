@@ -29,3 +29,9 @@ dbt/equity_transforms/logs/
 # General logs
 logs/
 *.log
+
+#Jupyter Notebooks
+notebooks/
+
+# Parquet data files
+*.parquet
