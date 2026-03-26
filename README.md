@@ -59,7 +59,12 @@
 ## Data Source
 
 
-[what yfinance is, which tickers, date range, fields: OHLCV + sector]
+**Library:** [yfinance](https://ranaroussi.github.io/yfinance/) — free, no API key required
+**Date range:** 2020-01-01 to 2024-12-31 (configurable via `.env`)
+**Universe:** 33 US equities (3 per GICS sector across all 11 sectors) + SPY benchmark
+**Fields:** date, open, high, low, close, volume, ticker, sector
+**Format:** Parquet — columnar, compressed, type-preserving
+**Lake path:** gs://equity-analytics-pipeline-equity-lake/raw/equities/ticker={TICKER}/data.parquet
 
 
 ## Data Pipeline
@@ -73,8 +78,28 @@
 ## BigQuery: Partitioning & Clustering
 
 
-Raw data is loaded into the `equity_raw` dataset provisioned by Terraform.
-Partitioning and clustering details are covered in Phase 4.
+The raw BigQuery table (`equity_raw.ohlcv_partitioned`) is:
+- **Partitioned by:** `date` — daily partitions (DATE column, no wrapper needed)
+- **Clustered by:** `ticker`, then `sector`
+
+
+**Why partition by date?**
+Every query in this pipeline — in dbt models and in the dashboard — filters by
+date range. BigQuery uses the partition boundary to skip entire days it doesn't
+need to scan. A query for the last 30 days reads ~30 partitions instead of
+the full table, reducing bytes scanned and query cost proportionally.
+
+
+**Why cluster by ticker and sector?**
+The dashboard and dbt models almost always GROUP BY or filter on ticker and sector.
+Clustering physically co-locates rows with the same ticker value in storage,
+so BigQuery reads a contiguous block of data for a given ticker rather than
+scanning the entire partition. For a 33-ticker dataset this reduces bytes
+scanned per query by approximately 1/33 when filtering on a single ticker.
+
+
+The dbt fact table (`equity_analytics.fact_daily_prices`) uses the same
+partitioning and clustering strategy, applied via dbt's `config()` macro.
 
 
 ## dbt Models
