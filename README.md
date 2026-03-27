@@ -45,6 +45,7 @@
 | Version Control        | Git + GitHub         | Tracks all code changes. Required for zoomcamp project submission and peer review. |
 | Orchestration          | Kestra               | Runs the 4-task pipeline DAG on a daily weekday schedule. Handles task dependencies, retries, and execution logging. |
 | Containerization       | Docker               | Runs Kestra and its backing Postgres database in isolated containers. Ensures the orchestration layer is reproducible across machines. |
+| Visualization | Looker Studio | Free BI tool with native BigQuery integration. Serves a two-tile dashboard — sector performance bar chart and stock price time series — directly from dbt reporting views. |
 
 
 ## Architecture
@@ -134,7 +135,10 @@ installed fresh per execution.
 ### Visualization
 
 
-[placeholder — to be completed in Phase 6]
+Looker Studio connects directly to BigQuery and queries the reporting
+layer views (`rpt_sector_performance`, `rpt_ticker_timeseries`) on demand.
+No data export or intermediate step is required. The dashboard updates
+automatically after each daily Kestra pipeline run.
 
 
 ## BigQuery: Partitioning & Clustering
@@ -194,8 +198,25 @@ prices, and computes `daily_return_pct` using a LAG window function.
 ## Dashboard
 
 
-[2 screenshots: sector bar chart tile + price time series tile]
-[link to live Looker Studio report]
+Two-tile Looker Studio dashboard connected directly to BigQuery:
+
+
+**Tile 1 — Average Daily Return by GICS Sector**
+Bar chart showing average daily return percentage per sector across the
+selected date range. Allows comparison of sector performance relative to
+the S&P 500 benchmark (SPY).
+
+
+**Tile 2 — Stock Price with 20-Day Moving Average**
+Time series showing daily close price and 20-day moving average for a
+selected ticker. Moving average is pre-computed by dbt in
+`fact_daily_prices` and served via `rpt_ticker_timeseries`.
+
+
+![Dashboard](images/dashboard.png)
+
+
+[View live dashboard](https://lookerstudio.google.com/reporting/1520a3de-3182-4253-9643-2a2fe92b8a08)
 
 
 ## Data Quality & Testing
