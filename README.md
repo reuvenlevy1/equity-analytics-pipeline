@@ -39,9 +39,12 @@
 | Cloud Platform         | GCP                  | Hosts all infrastructure — object storage (GCS), analytical database (BigQuery), and authentication (IAM service accounts). |
 | Data Lake              | Google Cloud Storage | Stores raw OHLCV data as Parquet files partitioned by ticker. Decouples ingestion from the warehouse — raw data survives independently of BigQuery. |
 | Data Warehouse         | BigQuery             | Stores and queries structured equity data. Tables are partitioned by date and clustered by ticker and sector for query efficiency. |
+| Transformation         | dbt Core             | Transforms raw BigQuery data through staging → marts → reporting layers. Applies moving averages, daily returns, and sector aggregations. Version-controlled SQL with built-in data quality tests. |
 | Data Ingestion         | Python + yfinance    | Downloads daily OHLCV data for 33 US equities and SPY from Yahoo Finance. No API key required. |
 | Environment Management | uv                   | Manages Python virtual environments and dependency locking. Ensures reproducible installs across local and containerized environments. |
 | Version Control        | Git + GitHub         | Tracks all code changes. Required for zoomcamp project submission and peer review. |
+| Orchestration          | Kestra               | Runs the 4-task pipeline DAG on a daily weekday schedule. Handles task dependencies, retries, and execution logging. |
+| Containerization       | Docker               | Runs Kestra and its backing Postgres database in isolated containers. Ensures the orchestration layer is reproducible across machines. |
 
 
 ## Architecture
@@ -70,9 +73,35 @@
 ## Data Pipeline
 
 
-[subsections per stage: Ingestion → Data Lake → Data Warehouse →
- Transformation → Orchestration → Visualization]
-[include: Kestra DAG screenshot, dbt lineage screenshot]
+### Ingestion
+
+
+Daily OHLCV data for 33 US equities and SPY is downloaded from Yahoo Finance
+via yfinance and uploaded to GCS as Parquet files. One file per ticker, stored
+at `raw/equities/ticker={TICKER}/data.parquet` using Hive-style partitioning.
+
+
+### Data Lake
+
+
+Raw Parquet files land in the GCS bucket
+`equity-analytics-pipeline-equity-lake`. This decouples ingestion from the
+warehouse — raw data is preserved independently of BigQuery and can be
+reloaded without re-fetching from yfinance.
+
+
+### Data Warehouse
+
+
+Parquet files are loaded from GCS into BigQuery as `equity_raw.ohlcv_raw`,
+then a partitioned and clustered version is created as
+`equity_raw.ohlcv_partitioned`. See BigQuery: Partitioning & Clustering below.
+
+
+### Transformation
+
+
+dbt Core transforms raw data through three layers. See dbt Models below.
 
 
 ### Orchestration
@@ -99,8 +128,13 @@ Each task runs in an isolated Docker container (`python:3.12-slim` for ingestion
 installed fresh per execution.
 
 
-<!-- TODO: replace screenshot after dbt tasks are re-enabled -->
 ![Kestra DAG](images/kestra_dag.png)
+
+
+### Visualization
+
+
+[placeholder — to be completed in Phase 6]
 
 
 ## BigQuery: Partitioning & Clustering
@@ -133,8 +167,28 @@ partitioning and clustering strategy, applied via dbt's `config()` macro.
 ## dbt Models
 
 
-[staging → marts → reporting layer names and what each model computes]
-[include dbt DAG lineage image]
+Transformations use dbt Core with the BigQuery adapter across three layers:
+
+
+**Staging** (`equity_analytics.stg_ohlcv`) — view
+Reads from `equity_raw.ohlcv_partitioned`. Casts types, filters invalid
+prices, and computes `daily_return_pct` using a LAG window function.
+
+
+**Marts**
+- `dim_tickers` (table) — distinct ticker/sector combinations
+- `fact_daily_prices` (table) — prices, daily returns, 20-day and 50-day
+  moving averages. Partitioned by date, clustered by ticker and sector.
+
+
+**Reporting**
+- `rpt_sector_performance` (view) — sector-level daily return aggregations,
+  feeds Dashboard Tile 1
+- `rpt_ticker_timeseries` (view) — price and moving average per ticker,
+  feeds Dashboard Tile 2
+
+
+![dbt Lineage](images/dbt_lineage.png)
 
 
 ## Dashboard
@@ -147,7 +201,18 @@ partitioning and clustering strategy, applied via dbt's `config()` macro.
 ## Data Quality & Testing
 
 
-[dbt generic tests: not_null, unique, accepted_values on sector]
+dbt generic tests run as Task 4 in the Kestra DAG after every dbt run:
+
+
+| Test | Model | Guards against |
+|------|-------|----------------|
+| `not_null` on date, ticker | `stg_ohlcv`, `fact_daily_prices` | Missing primary keys |
+| `unique` on ticker | `dim_tickers` | Duplicate dimension entries |
+| `unique_combination_of_columns` (date+ticker) | `fact_daily_prices` | Duplicate fact rows |
+| `accepted_values` on sector | source `ohlcv_partitioned` | Invalid sector names from ingestion |
+
+
+If any test fails, Kestra halts and the dashboard is not updated with bad data.
 
 
 ## Steps to Reproduce

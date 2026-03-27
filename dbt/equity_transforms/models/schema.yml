@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: stg_ohlcv
+    description: 'Cleaned and typed OHLCV data with daily return percentage'
+    columns:
+      - name: date
+        data_tests: [not_null]
+      - name: ticker
+        data_tests: [not_null]
+      - name: close
+        data_tests: [not_null]
+
+  - name: dim_tickers
+    description: 'Dimension table — distinct ticker and sector combinations'
+    columns:
+      - name: ticker
+        data_tests: [not_null, unique]
+
+  - name: fact_daily_prices
+    description: 'Fact table with prices and moving averages — partitioned and clustered'
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [date, ticker]
+    columns:
+      - name: date
+        data_tests: [not_null]
+      - name: ticker
+        data_tests: [not_null]
+
+  - name: rpt_sector_performance
+    description: 'Pre-aggregated sector returns — feeds dashboard tile 1'
+
+  - name: rpt_ticker_timeseries
+    description: 'Price and moving averages per ticker — feeds dashboard tile 2'
+
+sources:
+  - name: equity_raw
+    database: equity-analytics-pipeline
+    schema: equity_raw
+    tables:
+      - name: ohlcv_partitioned
+        description: 'Partitioned and clustered raw OHLCV table loaded by ingestion scripts'
+        columns:
+          - name: sector
+            data_tests:
+              - accepted_values:
+                  values:
+                    - Technology
+                    - Financials
+                    - Health Care
+                    - Energy
+                    - Cons. Discret.
+                    - Cons. Staples
+                    - Industrials
+                    - Materials
+                    - Real Estate
+                    - Utilities
+                    - Comm. Services
+                    - Benchmark

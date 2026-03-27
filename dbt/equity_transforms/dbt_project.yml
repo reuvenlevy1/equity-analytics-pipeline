@@ -1,0 +1,32 @@
+name: equity_transforms
+version: '1.0.0'
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'equity_transforms'
+
+# Specify where dbt should look for different types of files.
+# The `model-paths` config, for example, states that models in this project can be
+# found in the "models/" directory.
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+# Configures where dbt should put compiled SQL files and other artifacts.
+target-path: 'target'
+
+clean-targets:         # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+# Tell dbt to build all models in the models/ directory as tables by default.
+models:
+  equity_transforms:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+    reporting:
+      +materialized: view

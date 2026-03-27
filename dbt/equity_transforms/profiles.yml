@@ -1,0 +1,12 @@
+equity_transforms:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: equity-analytics-pipeline
+      dataset: equity_analytics
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      location: US
+      threads: 4
+      timeout_seconds: 300

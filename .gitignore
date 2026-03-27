@@ -26,6 +26,10 @@ dbt/equity_transforms/target/
 dbt/equity_transforms/dbt_packages/
 dbt/equity_transforms/logs/
 
+# dbt user-specific and auto-generated files
+dbt/equity_transforms/.user.yml
+dbt/equity_transforms/package-lock.yml
+
 # General logs
 logs/
 *.log
