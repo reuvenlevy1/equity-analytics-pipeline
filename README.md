@@ -239,16 +239,58 @@ If any test fails, Kestra halts and the dashboard is not updated with bad data.
 ## Steps to Reproduce
 
 
-[numbered ~8-10 steps, every shell command copy-pasteable]
-1. Prerequisites
-2. Clone repo
-3. GCP setup + service account
-4. Terraform init/apply
-5. Configure .env
-6. Run ingestion script
-7. Load to BigQuery
-8. Run dbt models
-9. Open Looker Studio
+A Makefile at the project root provides shortcut commands for all operations.
+Run `make help` to see all available commands after completing setup.
+
+
+**Prerequisites:**
+- WSL2 (Ubuntu-22.04) with uv, Git, gcloud CLI, Terraform, and Docker Desktop installed
+- A GCP account with billing enabled
+- Copy `.env.example` to `.env` and fill in your values
+
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/reuvenlevy1/equity-analytics-pipeline.git
+   cd equity-analytics-pipeline
+   ```
+
+
+2. **Install dependencies**
+   ```bash
+   make setup
+   ```
+
+
+3. **GCP setup** — create a service account, download credentials JSON,
+   save as `gcp-credentials.json` in the project root (see Phase 0 notes)
+
+
+4. **Provision infrastructure**
+   ```bash
+   make infra
+   ```
+
+
+5. **Configure environment** — copy `.env.example` to `.env` and fill in values
+
+
+6. **Run the full pipeline**
+   ```bash
+   make pipeline
+   ```
+
+
+7. **Start Kestra** (for scheduled execution)
+   ```bash
+   make up
+   make deploy-flow
+   ```
+   Then open http://localhost:8080 and trigger a manual execution to verify.
+
+
+8. **View the dashboard**
+   Open the live Looker Studio report: [Dashboard link](https://lookerstudio.google.com/reporting/1520a3de-3182-4253-9643-2a2fe92b8a08)
 
 
 ## Acknowledgements
