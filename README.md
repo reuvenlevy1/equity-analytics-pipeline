@@ -14,20 +14,75 @@
 ## Problem Statement
 
 
-[3-4 paragraphs: the business need, why equity data pipelines matter,
- tie-in to SMA/portfolio management context, what this project solves]
+Institutional asset managers running Separately Managed Account (SMA) strategies
+require clean, timely, structured equity data to execute daily portfolio
+rebalancing, performance attribution, and tax-loss harvesting. Without a
+reliable data platform, these workflows depend on manual data pulls, ad-hoc
+scripts, and brittle spreadsheets that introduce errors and delay.
+
+
+This project builds an end-to-end batch data pipeline that mirrors the data
+platform pattern used by SMA strategies at firms like BlackRock. It ingests
+daily OHLCV (Open, High, Low, Close, Volume) price data for 33 US equities
+across all 11 GICS sectors plus the S&P 500 ETF as a benchmark, transforming
+raw market data into analysis-ready tables with pre-computed analytics metrics.
+
+
+The pipeline answers two core questions that drive equity portfolio analysis:
+which sectors have generated the strongest risk-adjusted returns over a given
+period, and how has a specific stock's price trended relative to its moving
+average? These questions underpin sector rotation strategies, momentum signals,
+and mean-reversion analyses that are central to quantitative equity management.
+
+
+By automating ingestion, transformation, and visualization on a daily weekday
+schedule, this project demonstrates the data engineering foundation that makes
+systematic equity analysis reproducible, auditable, and scalable — the same
+properties required in regulated financial environments.
 
 
 ## Overview
 
 
-[2-3 paragraphs: what the pipeline does end-to-end, what the dashboard shows]
+This pipeline ingests daily OHLCV equity data for 33 US stocks across all 11
+GICS sectors and the SPY benchmark via yfinance, stores raw Parquet files in
+Google Cloud Storage, loads them into BigQuery as a partitioned and clustered
+table, and transforms the data through a three-layer dbt project into
+analysis-ready tables with daily returns and moving averages. The entire
+pipeline runs automatically on a daily weekday schedule via a Kestra DAG
+running in Docker.
+
+
+The Looker Studio dashboard surfaces two views of the data: a sector
+performance bar chart showing average daily return by GICS sector across a
+selected date range, and a stock price time series with 20-day moving average
+for any selected ticker. Both tiles are fed directly by dbt reporting views,
+ensuring the dashboard always reflects the latest pipeline run.
+
+
+All infrastructure is provisioned via Terraform (GCS bucket + BigQuery
+datasets), making the full cloud environment reproducible from a single
+terraform apply command. A Makefile at the project root provides shortcut
+commands for all pipeline operations, including make pipeline to run the
+full ingest → load → transform → test sequence.
 
 
 ## Table of Contents
 
 
-[linked section headers]
+- [Problem Statement](#problem-statement)
+- [Overview](#overview)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Data Source](#data-source)
+- [Data Pipeline](#data-pipeline)
+- [BigQuery: Partitioning & Clustering](#bigquery-partitioning--clustering)
+- [dbt Models](#dbt-models)
+- [Dashboard](#dashboard)
+- [Data Quality & Testing](#data-quality--testing)
+- [Steps to Reproduce](#steps-to-reproduce)
+- [Acknowledgements](#acknowledgements)
 
 
 ## Tech Stack
@@ -45,19 +100,71 @@
 | Version Control        | Git + GitHub         | Tracks all code changes. Required for zoomcamp project submission and peer review. |
 | Orchestration          | Kestra               | Runs the 4-task pipeline DAG on a daily weekday schedule. Handles task dependencies, retries, and execution logging. |
 | Containerization       | Docker               | Runs Kestra and its backing Postgres database in isolated containers. Ensures the orchestration layer is reproducible across machines. |
-| Visualization | Looker Studio | Free BI tool with native BigQuery integration. Serves a two-tile dashboard — sector performance bar chart and stock price time series — directly from dbt reporting views. |
+| Visualization          | Looker Studio        | Free BI tool with native BigQuery integration. Serves a two-tile dashboard — sector performance bar chart and stock price time series — directly from dbt reporting views. |
 
 
 ## Architecture
 
 
-[Lucidchart/draw.io diagram: yfinance → GCS → BigQuery → dbt → Looker Studio]
+![Architecture Diagram](images/architecture_diagram.png)
+
+
+**Data flow:** yfinance API → GCS (Parquet files) → BigQuery raw table →
+dbt transformations → BigQuery analytics tables → Looker Studio dashboard
+
+
+**Orchestration:** Kestra DAG runs all stages daily at 6 AM UTC on weekdays
+
+
+**Infrastructure:** Terraform provisions the GCS bucket and BigQuery datasets
 
 
 ## Project Structure
 
 
-[folder tree with ├── formatting + 1-line explanation per file/folder]
+```
+equity-analytics-pipeline/
+├── .env.example                          # Template for required environment variables
+├── .gitignore                            # Excludes credentials, state files, generated artifacts
+├── .python-version                       # Python version pin for uv
+├── Makefile                              # Shortcut commands: make pipeline, make up, make help
+├── README.md                             # This file
+├── docker-compose.yml                    # Runs Kestra + Postgres in Docker
+├── pyproject.toml                        # Python dependencies managed by uv
+├── uv.lock                               # Locked dependency versions for reproducibility
+├── dbt/
+│   └── equity_transforms/               # dbt project root
+│       ├── dbt_project.yml              # dbt project configuration and layer materializations
+│       ├── packages.yml                 # dbt-utils dependency declaration
+│       ├── profiles.yml                 # BigQuery connection config (uses env_var for credentials)
+│       └── models/
+│           ├── schema.yml               # Model documentation, data tests, source declarations
+│           ├── staging/
+│           │   └── stg_ohlcv.sql        # Cleans raw data, casts types, adds daily_return_pct
+│           ├── marts/
+│           │   ├── dim_tickers.sql      # Dimension table — distinct ticker/sector combinations
+│           │   └── fact_daily_prices.sql # Fact table — prices, returns, 20d/50d moving averages
+│           └── reporting/
+│               ├── rpt_sector_performance.sql  # Sector-level aggregations — feeds Dashboard Tile 1
+│               └── rpt_ticker_timeseries.sql   # Per-ticker price + MA — feeds Dashboard Tile 2
+├── images/
+│   ├── architecture_diagram.drawio      # Editable source for architecture diagram
+│   ├── architecture_diagram.png         # Architecture diagram embedded in README
+│   ├── dashboard.png                    # Looker Studio dashboard screenshot
+│   ├── dbt_lineage.png                  # dbt model lineage graph
+│   ├── kestra_dag.png                   # Kestra pipeline execution screenshot
+│   └── terraform_apply.png             # Terraform apply output screenshot
+├── ingestion/
+│   ├── ingest.py                        # Downloads OHLCV from yfinance, uploads to GCS as Parquet
+│   ├── load_to_bq.py                    # Loads GCS Parquet into BigQuery, creates partitioned table
+│   └── requirements.txt                # Ingestion-specific dependencies
+├── kestra/
+│   └── flows/
+│       └── equity_pipeline.yml          # Kestra DAG: ingest → load → dbt run → dbt test
+└── terraform/
+    ├── main.tf                          # GCS bucket + BigQuery dataset resource definitions
+    └── variables.tf                     # Project ID and region input variables
+```
 
 
 ## Data Source
@@ -247,6 +354,12 @@ Run `make help` to see all available commands after completing setup.
 - WSL2 (Ubuntu-22.04) with uv, Git, gcloud CLI, Terraform, and Docker Desktop installed
 - A GCP account with billing enabled
 - Copy `.env.example` to `.env` and fill in your values
+- Create the project symlink (required for Makefile):
+```bash
+  sudo ln -s "$(pwd)" /opt/equity-pipeline
+```
+  Run this from inside the cloned repository directory after step 1.
+```
 
 
 1. **Clone the repository**
@@ -296,4 +409,7 @@ Run `make help` to see all available commands after completing setup.
 ## Acknowledgements
 
 
-[DataTalks.Club | yfinance / Yahoo Finance | dbt Labs]
+- [DataTalks.Club](https://datatalks.club/) — Data Engineering Zoomcamp curriculum and community
+- [yfinance](https://ranaroussi.github.io/yfinance/) / Yahoo Finance — free equity market data
+- [dbt Labs](https://www.getdbt.com/) — dbt Core and dbt-utils package
+- [Kestra](https://kestra.io/) — open-source workflow orchestration platform
