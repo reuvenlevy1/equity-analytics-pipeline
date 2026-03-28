@@ -9,6 +9,8 @@ help: ## Show available commands
 
 setup: ## Install Python dependencies
 	uv sync
+	uv pip install -r ingestion/requirements.txt
+	uv pip install python-dotenv
 
 infra: ## Provision GCP infrastructure via Terraform
 	cd $(PROJECT_DIR)/terraform && terraform init && terraform apply -auto-approve
@@ -35,5 +37,5 @@ pipeline: ingest load transform test ## Run full pipeline: ingest -> load -> tra
 
 deploy-flow: ## Deploy Kestra flow via API (requires Kestra running on localhost:8080)
 	curl -X POST http://localhost:8080/api/v1/flows/import \
-		-u 'admin@equity-pipeline.local:YOUR_KESTRA_PASSWORD' \
+		-u 'YOUR_KESTRA_EMAIL:YOUR_KESTRA_PASSWORD' \
 		-F fileUpload=@$(PROJECT_DIR)/kestra/flows/equity_pipeline.yml

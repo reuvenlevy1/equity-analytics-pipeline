@@ -345,64 +345,85 @@ If any test fails, Kestra halts and the dashboard is not updated with bad data.
 
 ## Steps to Reproduce
 
-
 A Makefile at the project root provides shortcut commands for all operations.
 Run `make help` to see all available commands after completing setup.
 
-
 **Prerequisites:**
 - WSL2 (Ubuntu-22.04) with uv, Git, gcloud CLI, Terraform, and Docker Desktop installed
-- A GCP account with billing enabled
-- Copy `.env.example` to `.env` and fill in your values
-- Create the project symlink (required for Makefile):
-```bash
-  sudo ln -s "$(pwd)" /opt/equity-pipeline
-```
-  Run this from inside the cloned repository directory after step 1.
-```
-
+- A GCP account with billing enabled (see [GCP Free Tier](https://cloud.google.com/free))
 
 1. **Clone the repository**
-   ```bash
+```bash
    git clone https://github.com/reuvenlevy1/equity-analytics-pipeline.git
    cd equity-analytics-pipeline
-   ```
+```
 
+2. **Create the project symlink** (required for Makefile path resolution)
+```bash
+   sudo ln -s "$(pwd)" /opt/equity-pipeline
+```
 
-2. **Install dependencies**
-   ```bash
+3. **Install dependencies**
+```bash
    make setup
-   ```
+```
 
+4. **GCP setup** — create a service account and download a JSON credentials key:
+   - Go to [GCP Console → IAM → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+   - Create a service account with roles: `BigQuery Admin` and `Storage Admin`
+   - Click the service account → Keys → Add Key → Create new key → JSON
+   - Save the downloaded file as `gcp-credentials.json` in the project root
 
-3. **GCP setup** — create a service account, download credentials JSON,
-   save as `gcp-credentials.json` in the project root (see Phase 0 notes)
-
-
-4. **Provision infrastructure**
-   ```bash
+5. **Provision infrastructure**
+```bash
    make infra
-   ```
+```
 
+6. **Configure environment** — copy the template and fill in your values:
+```bash
+   cp .env.example .env
+```
+   Open `.env` and confirm the following values match your GCP setup:
+   - `BUCKET_NAME` — your GCS bucket name (created by Terraform)
+   - `PREFIX` — leave as `raw/equities/`
+   - `START_DATE` — start date for data ingestion (default: `2020-01-01`)
+   - `END_DATE` — end date for data ingestion (default: `2024-12-31`)
+   - `PROJECT_ID` — your GCP project ID
+   - `DATASET_RAW` — BigQuery dataset for raw data (default: `equity_raw`)
 
-5. **Configure environment** — copy `.env.example` to `.env` and fill in values
-
-
-6. **Run the full pipeline**
-   ```bash
+7. **Run the full pipeline**
+```bash
    make pipeline
-   ```
+```
 
-
-7. **Start Kestra** (for scheduled execution)
-   ```bash
+8. **Start Kestra** (for scheduled execution)
+```bash
    make up
+```
+   On first launch, navigate to http://localhost:8080 — you will be
+   redirected to http://localhost:8080/ui/setup. Create an admin account
+   with a username (or email) and password of your choice, then log in.
+
+   Update the Makefile `replace_with_username` with your username and `replace_with_password` with your password you just created:
+```bash
+   python3 << 'EOF'
+   content = open('Makefile').read()
+   old = "-u 'YOUR_KESTRA_EMAIL:YOUR_KESTRA_PASSWORD'"
+   new = "-u 'replace_with_username:replace_with_password'"
+   open('Makefile', 'w').write(content.replace(old, new))
+   print("Done")
+   EOF
+```
+   Then deploy the flow:
+```bash
    make deploy-flow
-   ```
-   Then open http://localhost:8080 and trigger a manual execution to verify.
+```
+   Open http://localhost:8080 → Flows → equity_pipeline → **Execute** to
+   trigger a manual run. Watch the Gantt tab — all 4 tasks should turn
+   green: `ingest` → `load_to_bq` → `dbt_run` → `dbt_test`. If any task
+   fails, click it to view the logs.
 
-
-8. **View the dashboard**
+9. **View the dashboard**
    Open the live Looker Studio report: [Dashboard link](https://lookerstudio.google.com/reporting/1520a3de-3182-4253-9643-2a2fe92b8a08)
 
 

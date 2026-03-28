@@ -16,8 +16,8 @@ tasks:
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
       volumes:
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+        - "/opt/equity-pipeline:/app/project"
+        - "/opt/equity-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
     containerImage: python:3.12-slim
     commands:
       - pip install yfinance pandas pyarrow google-cloud-storage python-dotenv --quiet
@@ -37,8 +37,8 @@ tasks:
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
       volumes:
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+        - "/opt/equity-pipeline:/app/project"
+        - "/opt/equity-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
     containerImage: python:3.12-slim
     commands:
       - pip install pandas pyarrow google-cloud-storage google-cloud-bigquery db-dtypes pandas-gbq python-dotenv --quiet
@@ -58,8 +58,8 @@ tasks:
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
       volumes:
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+        - "/opt/equity-pipeline:/app/project"
+        - "/opt/equity-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
     containerImage: ghcr.io/dbt-labs/dbt-bigquery:1.8.0
     env:
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
@@ -72,8 +72,8 @@ tasks:
     taskRunner:
       type: io.kestra.plugin.scripts.runner.docker.Docker
       volumes:
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline:/app/project"
-        - "/mnt/c/Users/Ninte/Python Projects/equity-analytics-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
+        - "/opt/equity-pipeline:/app/project"
+        - "/opt/equity-pipeline/gcp-credentials.json:/app/gcp-credentials.json:ro"
     containerImage: ghcr.io/dbt-labs/dbt-bigquery:1.8.0
     env:
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
